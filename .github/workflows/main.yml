@@ -17,13 +17,15 @@ jobs:
           python-version: '3.11'
 
       - name: Install deps
+        working-directory: PORT_BOT_CHILIAD_V2
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           pip install pyinstaller
 
       - name: Build EXE
-        run: pyinstaller --onefile --name PORT_BOT_CHILIAD port_bot.py
+        working-directory: PORT_BOT_CHILIAD_V2
+        run: python -m PyInstaller --onefile --name PORT_BOT_CHILIAD port_bot.py
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
