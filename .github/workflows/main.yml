@@ -1,0 +1,79 @@
+# ──────────────────────────────────────────────
+#  PORT BOT CHILIAD v2.0 — GitHub Actions Build
+#  Собирает Windows EXE при каждом пуше в main
+#  и при ручном запуске (workflow_dispatch)
+# ──────────────────────────────────────────────
+
+name: Build Windows EXE
+
+on:
+  workflow_dispatch:          # ручной запуск с вкладки Actions
+  push:
+    branches: [ main, master ]  # автозапуск при коммите
+  pull_request:
+    branches: [ main, master ]  # проверка PR перед merge
+
+jobs:
+  build:
+    name: Build on Windows
+    runs-on: windows-latest     # Windows Server 2022
+    timeout-minutes: 20          # максимум 20 мин, потом стоп
+
+    steps:
+
+      # 1. Клонируем репозиторий
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Устанавливаем Python 3.11 x64
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          architecture:    'x64'
+          cache:            'pip'    # кешируем pip между запусками
+
+      # 3. Устанавливаем зависимости
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # 4. Собираем EXE через PyInstaller
+      - name: Build EXE (PyInstaller)
+        run: |
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --windowed `
+            --add-data "config.json;." `
+            --name PORT_BOT_CHILIAD `
+            port_bot.py
+
+      # 5. Копируем сопутствующие файлы в dist/
+      - name: Copy runtime files to dist/
+        shell: pwsh
+        run: |
+          Copy-Item config.json    dist/config.json
+          Copy-Item README_RU.txt  dist/README_RU.txt
+
+      # 6. Проверяем, что EXE реально создан
+      - name: Verify build output
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "dist/PORT_BOT_CHILIAD.exe")) {
+            Write-Error "EXE not found — build failed"
+            exit 1
+          }
+          $size = (Get-Item "dist/PORT_BOT_CHILIAD.exe").length / 1MB
+          Write-Host "EXE size: $([math]::Round($size,1)) MB"
+
+      # 7. Загружаем артефакт (доступен 30 дней)
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name:              PORT_BOT_CHILIAD-Windows-x64
+          path:              dist/
+          if-no-files-found: error
+          retention-days:   30
